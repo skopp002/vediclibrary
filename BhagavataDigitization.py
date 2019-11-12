@@ -20,10 +20,29 @@ import cv2
 import pytesseract
 import imutils
 from PIL import Image, ImageFont, ImageDraw
+import tensorflow as tf
+
+
+
+'''
+Below code shows the contents of the file with hindi detection
+'''
+from PIL import Image
+import pytesseract
+
+img = Image.open("dataset/HandwrittenBhagavadGeethaShlokas.jpg")
+img.load()
+text = pytesseract.image_to_string(img, lang="hin")  #Specify language to look after!
+# print("Lets print character at a time")
+print(text)
+# for c in text:
+#     print("Char ",c)
+
 
 
 src_img = cv2.imread("/Users/sunitakoppar/Documents/FPKProject/dataset/P-149-R.jpg")
 #cv2.imshow('original',src_img);cv2.waitKey(0); cv2.destroyAllWindows()
+
 copy=src_img.copy()
 
 edged=cv2.Canny(src_img,30,200)
@@ -38,17 +57,10 @@ width=src_img[1]
 #cv2.imshow('canny edges after contouring', edged)
 #cv2.waitKey(0); cv2.destroyAllWindows()
 
-''' 
- The images we use here have multiple lines with multiple words in each line. 
- Each word has multiple characters and every character is comprised of multiple pixels.
- 
- OpenCV is the opensource computer vision library which helps represent any image into matrix 
- The approach here is, every character is comprised of multiple pixels and each pixel has 3 dimensions each 
- representing a color, red, green and blue. Thus every pixel becomes a vector with 3 dimensions.
- OpenCV provides a set of useful APIs to work with the matrices like binarization, dilation, grayscaling etc which helps in character recognition
- '''
+
 gray_img = cv2.cvtColor(src_img,cv2.COLOR_BGR2GRAY)
-cv2.imshow('gray image',gray_img);cv2.waitKey(0); cv2.destroyAllWindows()
+
+#cv2.imshow('gray image',gray_img);cv2.waitKey(0); cv2.destroyAllWindows()
 
 #binary
 ret,thresh = cv2.threshold(src_img,127,255,cv2.THRESH_BINARY_INV)
@@ -56,11 +68,30 @@ ret,thresh = cv2.threshold(src_img,127,255,cv2.THRESH_BINARY_INV)
 # print("Resizing the image")
 # src_img = cv2.resize(copy,dsize=(1320,int(1320*height/width)),interpolation=cv2.INTER_AREA)
 
+boundedimg = cv2.boundingRect(gray_img)
+cv2.imshow("boundedimg",boundedimg)
+
 #dilation
 kernel = np.ones((5,100), np.uint8)
 img_dilation = cv2.dilate(thresh, kernel, iterations=1)
 #cv2.imshow('dilated',img_dilation) ;cv2.waitKey(0)
 
+SZ = 20 # Character size. I am not sure if this is right number. Need to test
+def deskew(img):
+    m = cv2.moments(img)
+    if abs(m['mu02']) <  1e-2:
+        # no deskewing needed.
+        return img.copy()
+    # Calculate skew based on central momemts.
+    skew = m['mu11']/m['mu02']
+    print("Skew is ",skew)
+    # Calculate affine transform to correct skewness.
+    M = np.float32([[1, skew, -0.5*SZ*skew], [0, 1, 0]])
+    # Apply affine transform
+    img = cv2.warpAffine(img, M, (SZ, SZ), flags=cv2.WARP_INVERSE_MAP | cv2.INTER_LINEAR)
+    return img
+
+deskew(src_img)
 #find contours
 im2,ctrs, hier = cv2.findContours(img_dilation.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 #sort contours
