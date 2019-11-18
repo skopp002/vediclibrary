@@ -9,6 +9,12 @@
  '''
 from PIL import Image
 import pytesseract
+'''
+pytesseract just provides python bindings to the extent of calling tesseract installed locally on the system.
+tessearct itself is an open source library in C/C++
+'''
+
+import imutils
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -33,6 +39,24 @@ import imutils
 from PIL import Image, ImageFont, ImageDraw
 import tensorflow as tf
 
+
+def draw_contour(image, c, i):
+    # compute the center of the contour area and draw a circle
+    # representing the center
+    try:
+       M = cv2.moments(c)
+       cX = int(M["m10"] / M["m00"])
+       cY = int(M["m01"] / M["m00"])
+    except ZeroDivisionError as error:
+       print("error logging", error)
+    # draw the countour number on the image
+    #cv2.putText(image, "#{}".format(i + 1), (cX - 20, cY), cv2.FONT_HERSHEY_SIMPLEX,
+     #           1.0, (255, 255, 255), 2)
+
+    # return the image with the contour number drawn on it
+    return image
+
+
 '''
 Tesseract is an opensource OCR Engine with out of box capabilities to recognize upto 100 languages.
 pytesseract is the python binding to the tesseract installed on the operating system.
@@ -43,147 +67,91 @@ The out of box capabilities seem very limiting for Devanagari. To confirm its a 
 lets try recognizing the same shlokas written in english
 '''
 
-geeta_img = cv2.imread("dataset/Devanagari/HandwrittenGeetaShlokas_1.jpg")
+#geeta_img = cv2.imread("dataset/Devanagari/HandwrittenGeetaShlokas_1.jpg")
 simple_sanskrit =  cv2.imread("dataset/Devanagari/simpledevanagari.jpg")
+simple_sanskrit = imutils.resize(simple_sanskrit,height = 500)
 #cv2.imshow("document",geeta_img);cv2.waitKey(500) ; cv2.destroyAllWindows()
-height = geeta_img[0]
-width=geeta_img[1]
-text = pytesseract.image_to_string(geeta_img, lang="hin")  #Specify language to look after!
+# height = geeta_img[0]
+# width=geeta_img[1]
+# text = pytesseract.image_to_string(geeta_img, lang="hin")  #Specify language to look after!
 # print("Lets print character at a time")
 #print(text)
-simple_text = pytesseract.image_to_string(simple_sanskrit, lang="hin")
+simple_text = pytesseract.image_to_string(simple_sanskrit, lang="san")
 print(simple_text)
+'''OCR Output for this out of the box:
+Using hin as language
+कमल नलयज कमर मढात
+कमल रमणा नाशगयाए
 
-#Sanskrit language in english script
-eng_img1 = cv2.imread("dataset/English/GeethaEnglishHandwritten_1.jpg")
-test_eng = pytesseract.image_to_string(eng_img1, lang="eng")
-#print(test_eng)
-
-#English script and language
-eng_img2 =  cv2.imread("dataset/English/testocr_1.jpg")
-test_ocr = pytesseract.image_to_string(eng_img2, lang="eng")
-#print(test_ocr)
-
-
+Using san as language
+कमृ चयन कलर नदा
+नरम रमा नार) ला
 '''
-The performance out of box is lot better with english as script as well as the language
-Next we will split the characters individually and use the UCI dataset to train the models
-The below segment has been sourced from 
-https://github.com/watersink/Character-Segmentation/blob/master/test_char_seg.py
-and has been tweaked to suit the needs of the project
-'''
+gray_img = cv2.cvtColor(simple_sanskrit,cv2.COLOR_BGR2GRAY)
+#binarize
+ret, thresh = cv2.threshold(gray_img,127,255,cv2.THRESH_BINARY_INV)
+print("Thresholded version")
+print(pytesseract.image_to_string(thresh, lang="san"))
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+blurred_gray = cv2.GaussianBlur(gray_img, (5, 5), 0)
+print("Blurred version")
+print(pytesseract.image_to_string(blurred_gray, lang="san"))
+edged = cv2.Canny(blurred_gray, 75, 200)
+print("Edged version")
+print(pytesseract.image_to_string(edged, lang="san"))
+#dilation
+
+kernel = np.ones(thresh.shape[:1], np.uint8)
+img_dilation = cv2.dilate(thresh, kernel, iterations=1)
+
+#find contours
+#ctrs, hier = cv2.findContours(img_dilation.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+cnts = cv2.findContours(thresh.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+ctrs = imutils.grab_contours(cnts)
+#sort contours
+sorted_ctrs = sorted(ctrs, key=lambda ctr: cv2.boundingRect(ctr))
+
+#
+# boundingBoxes = [cv2.boundingRect(c) for c in sorted_ctrs]
+# (cnts, boundingBoxes) = zip(*sorted(zip(sorted_ctrs, boundingBoxes),key=lambda b:b[1][1], reverse=False))
+# for (i, c) in enumerate(cnts):
+#     draw_contour(simple_sanskrit, c, i)
+#
+# # show the output image
+# cv2.imshow("Sorted", simple_sanskrit)
+# cv2.waitKey(0)
+print("Num of sorted countors are ",len(sorted_ctrs))
+lines={}
+for i, ctr in enumerate(sorted_ctrs):
+    draw_contour(thresh, ctr, i)
+    #Get bounding box
+    x, y, w, h = cv2.boundingRect(ctr)
+    # Getting ROI
+    roi = thresh[y:y+h, x:x+w]
+    lines[i]=cv2.resize(roi,(28,28))
+    # show ROI
+    cv2.imshow('segment no:'+str(i),roi)
+    cv2.waitKey(0)
+    cv2.imwrite("./contour_segments/segment_no_"+str(i)+".png",roi)
+    cv2.rectangle(thresh,(x,y),( x + w, y + h ),(90,0,255),2)
 
 
-class Char_segment(object):
-    def __init__(self):
-        self.input_shape = (2048, 64, 3)
-        self.batch_size = 1
-        self.graph = tf.Graph()
-        with self.graph.as_default():
-            self.model = self.network()
-            init = tf.global_variables_initializer()
-            self.session = tf.Session(graph=self.graph)
-            self.session.run(init)
-            saver = tf.train.Saver(tf.global_variables())
-            saver.restore(save_path='./save/char_seg.ckpt-4000', sess=self.session)
+# cv2.imwrite('final_bounded_box_image.png',blurred_gray)
+# cv2.imshow('marked areas',thresh)
+# cv2.waitKey(0)
 
-    def network(self):
-        network = {}
-       # network["inputs"] = tf.placeholder(tf.float32, [self.batch_size, self.input_shape[1], self.input_shape[0],
-        #                                                self.input_shape[2]], name='inputs')
-        network["down-conv1"] = tf.layers.conv2d(inputs=network["inputs"], filters=32, kernel_size=(2, 2),
-                                                 padding="same", activation=tf.nn.relu, name="down-conv1")
-        network["down-pool1"] = tf.layers.max_pooling2d(inputs=network["down-conv1"], pool_size=[2, 2], strides=2)
-        network["down-conv2"] = tf.layers.conv2d(inputs=network["down-pool1"], filters=64, kernel_size=(2, 2),
-                                                 padding="same", activation=tf.nn.relu, name="down-conv2")
-        network["down-pool2"] = tf.layers.max_pooling2d(inputs=network["down-conv2"], pool_size=[2, 2], strides=2)
-        network["down-conv3"] = tf.layers.conv2d(inputs=network["down-pool2"], filters=128, kernel_size=(2, 2),
-                                                 padding="same", activation=tf.nn.relu, name="down-conv3")
-        network["down-pool3"] = tf.layers.max_pooling2d(inputs=network["down-conv3"], pool_size=[2, 2], strides=2)
-        network["down-conv4"] = tf.layers.conv2d(inputs=network["down-pool3"], filters=256, kernel_size=(2, 2),
-                                                 padding="same", activation=tf.nn.relu, name="down-conv4")
-        network["down-pool4"] = tf.layers.max_pooling2d(inputs=network["down-conv4"], pool_size=[2, 2], strides=2)
-        network["down-conv5"] = tf.layers.conv2d(inputs=network["down-pool4"], filters=512, kernel_size=(2, 2),
-                                                 padding="same", activation=tf.nn.relu, name="down-conv5")
-        network["down-pool5"] = tf.layers.max_pooling2d(inputs=network["down-conv5"], pool_size=[2, 2], strides=2)
-        network["down-conv6"] = tf.layers.conv2d(inputs=network["down-pool5"], filters=512, kernel_size=(2, 2),
-                                                 padding="same", activation=tf.nn.relu, name="down-conv6")
-        network["down-pool6"] = tf.layers.max_pooling2d(inputs=network["down-conv6"], pool_size=[2, 2], strides=2)
+bin_img=cv2.adaptiveThreshold(gray_img,255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY_INV, 21,20)
+# cv2.imshow("binarized",bin_img) ;cv2.waitKey(500) ; cv2.destroyAllWindows()
+binarized_text = pytesseract.image_to_string(bin_img, lang="hin")
+print("Binarized text", binarized_text)  #Prints garbage
+# #Sanskrit language in english script
+# eng_img1 = cv2.imread("dataset/English/GeethaEnglishHandwritten_1.jpg")
+# test_eng = pytesseract.image_to_string(eng_img1, lang="eng")
+# #print(test_eng)
+#
+# #English script and language
+# eng_img2 =  cv2.imread("dataset/English/testocr_1.jpg")
+# test_ocr = pytesseract.image_to_string(eng_img2, lang="eng")
+# #print(test_ocr)
+#
 
-        network["up-conv1"] = tf.layers.conv2d_transpose(inputs=network["down-pool6"], filters=512, kernel_size=(1, 2),
-                                                         strides=(1, 2), padding="valid", activation=tf.nn.relu,
-                                                         name="up-conv1")
-        network["up-conv2"] = tf.layers.conv2d_transpose(inputs=network["up-conv1"], filters=512, kernel_size=(1, 2),
-                                                         strides=(1, 2), padding="valid", activation=tf.nn.relu,
-                                                         name="up-conv2")
-        network["up-conv3"] = tf.layers.conv2d_transpose(inputs=network["up-conv2"], filters=256, kernel_size=(1, 2),
-                                                         strides=(1, 2), padding="valid", activation=tf.nn.relu,
-                                                         name="up-conv3")
-        network["up-conv4"] = tf.layers.conv2d_transpose(inputs=network["up-conv3"], filters=128, kernel_size=(1, 2),
-                                                         strides=(1, 2), padding="valid", activation=tf.nn.relu,
-                                                         name="up-conv4")
-        network["up-conv5"] = tf.layers.conv2d_transpose(inputs=network["up-conv4"], filters=64, kernel_size=(1, 2),
-                                                         strides=(1, 2), padding="valid", activation=tf.nn.relu,
-                                                         name="up-conv5")
-        network["up-conv6"] = tf.layers.conv2d_transpose(inputs=network["up-conv5"], filters=1, kernel_size=(1, 2),
-                                                         strides=(1, 2), padding="valid", activation=None,
-                                                         name="up-conv6")
-
-        network["outputs"] = tf.nn.sigmoid(tf.contrib.layers.flatten(network["up-conv6"]))
-        return network
-
-    def recognize_image(self, img):
-        # img= cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        resized_img = cv2.resize(img, (self.input_shape[0], self.input_shape[1]), interpolation=cv2.INTER_AREA)
-        image = resized_img.reshape(1, self.input_shape[1], self.input_shape[0], self.input_shape[2])
-        image = image.astype('float32') / 255.0
-        with self.graph.as_default():
-            feed = {self.model["inputs"]: image}
-            mat_results = self.session.run(self.model["outputs"], feed_dict=feed)
-
-        print(np.max(np.max(mat_results)), np.min(np.min(mat_results)))
-        mat_results[mat_results >= 0.5] = 1
-        mat_results[mat_results < 0.5] = 0
-        boxes = self.generate_box(mat_results)
-        return boxes, mat_results[0] * 255
-
-    def generate_box(self, mat_results):
-        boxes = []
-        box = [0, 0, 0, self.input_shape[1]]
-
-        mat_results = mat_results[0]
-
-        for i in range(len(mat_results) - 1):
-            if box[0] != 0 and box[2] != 0:
-                boxes.append(box)
-                box = [0, 0, 0, self.input_shape[1]]
-
-            if mat_results[i] == 0:
-                continue
-            elif mat_results[i] == 1 and box[0] == 0:
-                box[0] = i
-            elif mat_results[i] == 1 and box[0] != 0 and mat_results[i + 1] == 0:
-                box[2] = i + 1
-            else:
-                continue
-
-        return boxes
-
-if __name__ == '__main__':
-    cs = Char_segment()
-    img = geeta_img
-    img = cv2.resize(img, (2048, 48), interpolation=cv2.INTER_AREA)
-    assert (img is not None)
-    boxes, mat_results = cs.recognize_image(img)
-    for i in range(len(mat_results)):
-        if mat_results[i] > 128:
-            cv2.circle(img, (i, 24), 1, (0, 0, 255), -1)
-
-    for box in boxes:
-        print(box)
-        cv2.rectangle(img, (box[0], box[1]), (box[2], box[3]), (255, 0, 0), 2)
-    cv2.imwrite("4.png", img)
-    cv2.imshow("result", img)
-    cv2.waitKey()
