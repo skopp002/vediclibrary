@@ -12,19 +12,19 @@ from pyspark.ml.tuning import ParamGridBuilder
 from pyspark.ml.tuning import CrossValidator
 from pyspark.ml.feature import IndexToString, StringIndexer, VectorIndexer
 from pyspark.ml.feature import CountVectorizer
-
+import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import PIL
-from tensorflow.keras import layers
+from tensorflow import keras
 import time
 
 from IPython import display
 
 
 ##Reference https://www.tensorflow.org/tutorials/generative/dcgan
-im=Image.open("/Users/sunitakoppar/PycharmProjects/datasets/DevanagariHandwrittenCharacterDataset/Train")      #Actual data /Users/sunitakoppar/Documents/FPKProject/dataset/P-149-R.jpg
+im=Image.open("/Users/sunitakoppar/PycharmProjects/datasets/DevanagariHandwrittenCharacterDataset/Train/*")      #Actual data /Users/sunitakoppar/Documents/FPKProject/dataset/P-149-R.jpg
 pytesseract.pytesseract.tesseract_cmd="/usr/local/bin/tesseract"
 text=pytesseract.image_to_string(im,lang='script/Devanagari')
 (train_images, train_labels), (_, _) = tf.keras.datasets.mnist.load_data()
@@ -38,24 +38,24 @@ train_dataset = tf.data.Dataset.from_tensor_slices(train_images).shuffle(BUFFER_
 
 def make_generator_model():
     model = tf.keras.Sequential()
-    model.add(layers.Dense(7*7*256, use_bias=False, input_shape=(100,)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.LeakyReLU())
+    model.add(keras.layers.Dense(7*7*256, use_bias=False, input_shape=(100,)))
+    model.add(keras.layers.BatchNormalization())
+    model.add(keras.layers.LeakyReLU())
 
-    model.add(layers.Reshape((7, 7, 256)))
+    model.add(keras.layers.Reshape((7, 7, 256)))
     assert model.output_shape == (None, 7, 7, 256) # Note: None is the batch size
 
-    model.add(layers.Conv2DTranspose(128, (5, 5), strides=(1, 1), padding='same', use_bias=False))
+    model.add(keras.layers.Conv2DTranspose(128, (5, 5), strides=(1, 1), padding='same', use_bias=False))
     assert model.output_shape == (None, 7, 7, 128)
-    model.add(layers.BatchNormalization())
-    model.add(layers.LeakyReLU())
+    model.add(keras.layers.BatchNormalization())
+    model.add(keras.layers.LeakyReLU())
 
-    model.add(layers.Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same', use_bias=False))
+    model.add(keras.layers.Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same', use_bias=False))
     assert model.output_shape == (None, 14, 14, 64)
-    model.add(layers.BatchNormalization())
-    model.add(layers.LeakyReLU())
+    model.add(keras.layers.BatchNormalization())
+    model.add(keras.layers.LeakyReLU())
 
-    model.add(layers.Conv2DTranspose(1, (5, 5), strides=(2, 2), padding='same', use_bias=False, activation='tanh'))
+    model.add(keras.layers.Conv2DTranspose(1, (5, 5), strides=(2, 2), padding='same', use_bias=False, activation='tanh'))
     assert model.output_shape == (None, 28, 28, 1)
 
     return model
@@ -70,17 +70,17 @@ plt.imshow(generated_image[0, :, :, 0], cmap='gray')
 
 def make_discriminator_model():
     model = tf.keras.Sequential()
-    model.add(layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same',
+    model.add(keras.layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same',
                                      input_shape=[28, 28, 1]))
-    model.add(layers.LeakyReLU())
-    model.add(layers.Dropout(0.3))
+    model.add(keras.layers.LeakyReLU())
+    model.add(keras.layers.Dropout(0.3))
 
-    model.add(layers.Conv2D(128, (5, 5), strides=(2, 2), padding='same'))
-    model.add(layers.LeakyReLU())
-    model.add(layers.Dropout(0.3))
+    model.add(keras.layers.Conv2D(128, (5, 5), strides=(2, 2), padding='same'))
+    model.add(keras.layers.LeakyReLU())
+    model.add(keras.layers.Dropout(0.3))
 
-    model.add(layers.Flatten())
-    model.add(layers.Dense(1))
+    model.add(keras.layers.Flatten())
+    model.add(keras.layers.Dense(1))
 
     return model
 
