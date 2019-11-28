@@ -33,7 +33,7 @@ def checkExistingDimensions():
     imarray = np.asarray(sample_img.getdata())
     #print("Image Array is ",imarray)
     pprint.pprint(imarray)
-    custom_img = Image.open("./devanagari_custom_dataset/Train/character_1_ka/char_new0.png")
+    custom_img = Image.open("./devanagari_custom_dataset/Train/character_1_ka/char_new1.png")
     custarray =   np.asarray(custom_img.getdata())
     pprint.pprint(custarray);
 

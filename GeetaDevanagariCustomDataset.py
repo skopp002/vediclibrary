@@ -61,6 +61,7 @@ T_train=[]
 T_test=[]
 cnn=Sequential()
 knn=KNeighborsClassifier()
+random=RandomForestClassifier()
 le=preprocessing.LabelEncoder()
 le_name_mapping=dict()
 
@@ -163,29 +164,40 @@ def characterSegmentation():
                    # img = roi.resize((32, 32))
                     img = np.pad(cv2.resize(roi, (28,28)), 2)
                     write_status = cv2.imwrite(word_dir+"/char_new"+str(j)+".png",img)
-                    predictCharacters(img, i,j)
+                    predictCharacters('knn', img, i,j)
 
 
-def predictCharacters(char_img, word_count, char_count):
+def predictCharacters(clsfr, char_img, word_count, char_count):
    # try:
    imgData = np.array(char_img)
    flat = imgData.flatten()
    np.shape(flat)
-   flat = char_img.reshape(1, 32, 32, -1)  # (1, -1)
-   cnn_pred_mat = cnn.predict(flat)
-   cnn_pred = np.argmax(cnn_pred_mat[0], axis=-1)
-   label=le_name_mapping.get(cnn_pred,str(cnn_pred))
+   label=''
+   if(clsfr == 'cnn'):
+        flat = char_img.reshape(1, 32, 32, -1)  # (1, -1)
+        cnn_pred_mat = cnn.predict(flat)
+        cnn_pred = np.argmax(cnn_pred_mat[0], axis=-1)
+        label=le_name_mapping.get(cnn_pred,str(cnn_pred))
+        # except ValueError:
+        #    print("Unknown label, skipping ..")
+   elif(clsfr == 'knn'):
+       flat = char_img.reshape(1, -1)  # (1, -1)
+       knn_pred_mat = knn.predict(flat)
+       knn_pred=np.argmax(knn_pred_mat[0], axis=-1)
+       label = le_name_mapping.get(knn_pred, str(knn_pred))
+   elif(clsfr == 'random'):
+       flat = char_img.reshape(1, -1)  # (1, -1)
+       random_pred_mat = random.predict(flat)
+       random_pred = np.argmax(random_pred_mat[0], axis=-1)
+       label = le_name_mapping.get(random_pred, str(random_pred))
    cv2.imshow("displaying " + label + str(word_count) + str(char_count), char_img);
    cv2.waitKey(1000)
-   #print("CNN prediction is ",le.inverse_transform(cnn_pred_mat[0]))
-    #except ValueError:
-    #    print("Unknown label, skipping ..")
-  #knn_pred = knn.predict(char_img)
-  # print("KNN Prediction is", knn_pred)
+
 
 
 def prepareClassifiers():
-    #knnClassifier()
+    knnClassifier()
+    randomForestClassifier()
     cnnClassifier()
 
 def genericClassifier(clfr,  acc_str, matrix_header_str):
@@ -240,6 +252,13 @@ def prepareTestTrainData():
     prepareClassifiers()
 
 
+def randomForestClassifier():
+  print('Random Forest Classifier starting ...')
+  global random
+  y_pred, randomacc = genericClassifier(random, "CNN-Random Accuracy: {0:0.1f}%", "SVM Confusion matrix")
+
+
+
 def knnClassifier():
   print('KNN Classifier starting ...')
   global knn
@@ -272,8 +291,8 @@ def cnnClassifier():
      cnn.add(pool_1)
      flat_layer_0 = Flatten()
      cnn.add(Flatten())
-     drop_layer_0 = Dropout(0.2)
-     cnn.add(drop_layer_0)
+     # drop_layer_0 = Dropout(0.2)
+     # cnn.add(drop_layer_0)
      # Now add the Dense layers
      h_dense_0 = Dense(units=10, activation=ip_activation, kernel_initializer='uniform')
      cnn.add(h_dense_0)
