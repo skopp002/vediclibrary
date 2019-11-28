@@ -62,6 +62,7 @@ T_test=[]
 cnn=Sequential()
 knn=KNeighborsClassifier()
 le=preprocessing.LabelEncoder()
+le_name_mapping=dict()
 
 
 def attemptOutOfBoxOCR():
@@ -149,7 +150,7 @@ def characterSegmentation():
             os.makedirs(word_dir)
         # sort contours
         sorted_ctrs = sorted(ctrs, key=lambda ctr: cv2.boundingRect(ctr))
-        for i, cnt in enumerate(sorted_ctrs):
+        for j, cnt in enumerate(sorted_ctrs):
             if (cv2.contourArea(cnt) > 40):
                 x, y, w, h = cv2.boundingRect(cnt)
                 cv2.rectangle(croppedImage, (x, y), (x + w, y + h), (0, 255, 0), 2)
@@ -161,26 +162,24 @@ def characterSegmentation():
                    # print("char image shape is ", roi.shape)
                    # img = roi.resize((32, 32))
                     img = np.pad(cv2.resize(roi, (28,28)), 2)
-                    write_status = cv2.imwrite(word_dir+"/char_new"+str(i)+".png",img)
-                   # img = roi.convert('L')
-                    imgData = np.array(img)
-                    # inverted_image.save('new1.jpg')
-                    # np.set_printoptions(threshold=100)
-                    flat = imgData.flatten()
-                    np.shape(flat)
-                    flat = img.reshape(1,32,32,-1)#(1, -1)
-                    cv2.imshow("predicting"+str(i),img);cv2.waitKey(100)
-                    predictCharacters(flat)
+                    write_status = cv2.imwrite(word_dir+"/char_new"+str(j)+".png",img)
+                    predictCharacters(img, i,j)
 
 
-def predictCharacters(char_img):
+def predictCharacters(char_img, word_count, char_count):
    # try:
-        cnn_pred = cnn.predict(char_img)
-        print("CNN prediction is ",np.argmax(cnn_pred[0], axis=-1))#le.inverse_transform(cnn_pred[0]))
+   imgData = np.array(char_img)
+   flat = imgData.flatten()
+   np.shape(flat)
+   flat = char_img.reshape(1, 32, 32, -1)  # (1, -1)
+   cnn_pred_mat = cnn.predict(flat)
+   cnn_pred = np.argmax(cnn_pred_mat[0], axis=-1)
+   label=le_name_mapping.get(cnn_pred,str(cnn_pred))
+   cv2.imshow("displaying " + label + str(word_count) + str(char_count), char_img);
+   cv2.waitKey(1000)
+   #print("CNN prediction is ",le.inverse_transform(cnn_pred_mat[0]))
     #except ValueError:
     #    print("Unknown label, skipping ..")
-
-
   #knn_pred = knn.predict(char_img)
   # print("KNN Prediction is", knn_pred)
 
@@ -233,7 +232,8 @@ def prepareTestTrainData():
     le.fit(T)
     T = le.transform(T)
     T = keras.utils.np_utils.to_categorical(T)
-    le_name_mapping = dict(zip(le.classes_, le.transform(le.classes_)))
+    global le_name_mapping
+    le_name_mapping = dict(zip(le.transform(le.classes_),le.classes_))
     print("Labels are" ,le_name_mapping)
     global X_train, X_test, T_train, T_test
     X_train, X_test, T_train, T_test = train_test_split(X, T, test_size=0.3, random_state=34)
@@ -272,8 +272,10 @@ def cnnClassifier():
      cnn.add(pool_1)
      flat_layer_0 = Flatten()
      cnn.add(Flatten())
+     drop_layer_0 = Dropout(0.2)
+     cnn.add(drop_layer_0)
      # Now add the Dense layers
-     h_dense_0 = Dense(units=20, activation=ip_activation, kernel_initializer='uniform')
+     h_dense_0 = Dense(units=10, activation=ip_activation, kernel_initializer='uniform')
      cnn.add(h_dense_0)
      # Let's add one more before proceeding to the output layer
      n_classes = 10#36 --> undo
@@ -290,7 +292,7 @@ def cnnClassifier():
      x_test = X_test.reshape(X_test.shape[0], *im_shape)
      cnn.compile(optimizer=opt, loss=loss, metrics=metrics)
      history = cnn.fit(x_train, T_train,
-                       batch_size=300, epochs=5,
+                       batch_size=10, epochs=10,
                        validation_data=(x_test, T_test))
      scores = cnn.evaluate(x_test, T_test, verbose=0)
      print("Accuracy: %.2f%%" % (scores[1] * 100))
