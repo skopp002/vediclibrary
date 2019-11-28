@@ -54,9 +54,19 @@ The out of box capabilities seem very limiting for Devanagari. To confirm its a 
 lets try recognizing the same shlokas written in english
 '''
 
+#Global Variables
+X_train=[]
+X_test=[]
+T_train=[]
+T_test=[]
+cnn=Sequential()
+knn=KNeighborsClassifier()
+le=preprocessing.LabelEncoder()
+
+
 def attemptOutOfBoxOCR():
     #geeta_img = cv2.imread("dataset/Devanagari/HandwrittenGeetaShlokas_1.jpg")
-    simple_sanskrit =  cv2.imread("dataset/Devanagari/simpledevanagari.jpg")
+    simple_sanskrit =  cv2.imread("sourcetexts/Devanagari/simpledevanagari.jpg")
     simple_sanskrit = imutils.resize(simple_sanskrit,height = 500)
     #cv2.imshow("document",geeta_img);cv2.waitKey(500) ; cv2.destroyAllWindows()
     # height = geeta_img[0]
@@ -147,35 +157,52 @@ def characterSegmentation():
                 # cv2.imshow('character no:' + str(i), roi)
                 # cv2.waitKey(1000)
                 if(w <= 200):
-                    cv2.imshow(word_dir+"/char"+str(i)+".png", roi)
-                    print("char image shape is ", roi.shape)
+                   # cv2.imshow(word_dir+"/char"+str(i)+".png", roi)
+                   # print("char image shape is ", roi.shape)
                    # img = roi.resize((32, 32))
+                    img = np.pad(cv2.resize(roi, (28,28)), 2)
+                    write_status = cv2.imwrite(word_dir+"/char_new"+str(i)+".png",img)
                    # img = roi.convert('L')
-                    imgData = np.array(roi)
-                    plt.imshow(imgData)
+                    imgData = np.array(img)
                     # inverted_image.save('new1.jpg')
                     # np.set_printoptions(threshold=100)
+
                     flat = imgData.flatten()
                     np.shape(flat)
-                    flat = flat.reshape(1, -1)
-                    buildclassifier("knn",flat)
+                    flat = img.reshape(1,32,32,-1)#(1, -1)
+                    predictCharacters(img)
 
 
+def predictCharacters(char_img):
+    try:
+        print("Attempting to print")
+        cnn_pred = cnn.predict(char_img)
+        cv2.imshow("to predict",char_img)
+        print("CNN prediction is ",np.argmax(cnn_pred[0], axis=-1))#le.inverse_transform(cnn_pred[0]))
+    except ValueError:
+        print("Unknown label, skipping ..")
+
+  #knn_pred = knn.predict(char_img)
+  # print("KNN Prediction is", knn_pred)
 
 
-def genericClassifier(clfr, x_train_data, y_train_data, x_test_data, y_test_data, acc_str, matrix_header_str):
+def prepareClassifiers():
+    #knnClassifier()
+    cnnClassifier()
+
+def genericClassifier(clfr,  acc_str, matrix_header_str):
     """run chosen classifier and display results"""
     start_time = time.time()
-    clfr.fit(x_train_data, y_train_data)
-    y_pred = clfr.predict(x_test_data)
+    clfr.fit(X_train, T_train)
+    y_pred = clfr.predict(X_test)
     print("Time taken for prediction = %f seconds" % (time.time() - start_time))
-    print(acc_str.format(accuracy_score(y_test_data, y_pred) * 100))
-    acc=accuracy_score(y_test_data, y_pred) * 100
+    print(acc_str.format(accuracy_score(T_test, y_pred) * 100))
+    acc=accuracy_score(T_test, y_pred) * 100
     print("acc=",acc)
     return y_pred,acc
 
 #Code reference https://github.com/PriSawant7/ML-Devanagari-Character-Recognition/blob/master/Devanagari_Character_Recoginition.ipynb
-def buildclassifier(classifier_name, char_img):
+def prepareTestTrainData():
     path = "/Users/sunitakoppar/PycharmProjects/datasets/DevanagariHandwrittenCharacterDataset/Train/"
     folders = os.listdir(path)
     imageList = []
@@ -205,81 +232,69 @@ def buildclassifier(classifier_name, char_img):
     print('Features size = ', X.shape)
     print('Labels size = ', T.shape)
     print(T)
-    le = preprocessing.LabelEncoder()
+    global le
     le.fit(T)
     T = le.transform(T)
     T = keras.utils.np_utils.to_categorical(T)
     le_name_mapping = dict(zip(le.classes_, le.transform(le.classes_)))
-    print(le_name_mapping)
+    print("Labels are" ,le_name_mapping)
+    global X_train, X_test, T_train, T_test
     X_train, X_test, T_train, T_test = train_test_split(X, T, test_size=0.3, random_state=34)
-    img_height_rows = 32
-    img_width_cols = 32
-    im_shape = (img_height_rows, img_width_cols, 1)
-    print(im_shape)
-    x_train = X_train.reshape(X_train.shape[0], *im_shape)  # Python TIP :the * operator unpacks the tuple
-    x_test = X_test.reshape(X_test.shape[0], *im_shape)
-    if(classifier_name == "cnn"):
-        cnn = Sequential()
-        kernelSize = (3, 3)
-        ip_activation = 'relu'
-        ip_conv_0 = Conv2D(filters=4, kernel_size=kernelSize, input_shape=im_shape, activation=ip_activation)
-        cnn.add(ip_conv_0)
-        # Add the next Convolutional+Activation layer
-        ip_conv_0_1 = Conv2D(filters=4, kernel_size=kernelSize, activation=ip_activation)
-        cnn.add(ip_conv_0_1)
-        # Add the Pooling layer
-        pool_0 = MaxPool2D(pool_size=(2, 2), strides=(2, 2), padding="same")
-        cnn.add(pool_0)
-        ip_conv_1 = Conv2D(filters=4, kernel_size=kernelSize, activation=ip_activation)
-        cnn.add(ip_conv_1)
-        ip_conv_1_1 = Conv2D(filters=4, kernel_size=kernelSize, activation=ip_activation)
-        cnn.add(ip_conv_1_1)
-        pool_1 = MaxPool2D(pool_size=(2, 2), strides=(2, 2), padding="same")
-        cnn.add(pool_1)
-        flat_layer_0 = Flatten()
-        cnn.add(Flatten())
-        # Now add the Dense layers
-        h_dense_0 = Dense(units=20, activation=ip_activation, kernel_initializer='uniform')
-        cnn.add(h_dense_0)
-        # Let's add one more before proceeding to the output layer
-        h_dense_1 = Dense(units=1024, activation=ip_activation, kernel_initializer='uniform', name='dense11')
-        cnn.add(h_dense_1)
-        n_classes = 36
-        op_activation = 'softmax'
-        output_layer = Dense(units=n_classes, activation=op_activation, kernel_initializer='uniform')
-        cnn.add(output_layer)
-        opt = optimizers.Adagrad(lr=0.001)
-        loss = 'categorical_crossentropy'
-        metrics = ['accuracy']
-        # Compile the classifier using the configuration we want
-        cnn.compile(optimizer=opt, loss=loss, metrics=metrics)
-        history = cnn.fit(x_train, T_train,
-                      batch_size=36, epochs=36,
-                      validation_data=(x_test, T_test))
-        scores = cnn.evaluate(x_test, T_test, verbose=0)
-        print("Accuracy: %.2f%%" % (scores[1] * 100))
-        y_pred = cnn.predict(char_img)
-        print("Prediction is ",y_pred[0])
-    # model = cnn
-    # layer_name = 'dense11'
-    # intermediate_layer_model = Model(inputs=cnn.input,
-    #                                  outputs=model.get_layer(layer_name).output)
-    # intermediate_output = intermediate_layer_model.predict(x_train)
-    # elif(classifier_name == "random_forest"):
-    #     print('KNN Classifier starting ...')
-    #     partialDataKNNClassifier = KNeighborsClassifier()
-    #     y_pred, knnacc = genericClassifier(partialDataKNNClassifier, X_train, T_train, X_test, T_test,
-    #                                    "CNN-KNN Accuracy: {0:0.1f}%", "SVM Confusion matrix")
-    #     y_pred = cnn.predict(char_img)
-    #     print("Prediction is ", y_pred[0])
-    elif (classifier_name == "knn"):
-        print('KNN Classifier starting ...')
-        partialDataKNNClassifier = KNeighborsClassifier()
-        y_pred, knnacc = genericClassifier(partialDataKNNClassifier, X_train, T_train, X_test, T_test,
-                                           "CNN-KNN Accuracy: {0:0.1f}%", "SVM Confusion matrix")
-        le.inverse_transform(y_pred[0])
-        char_pred = partialDataKNNClassifier.predict(char_img)
-        print("knn prediction for given character ", char_pred)
+    prepareClassifiers()
+
+
+def knnClassifier():
+  print('KNN Classifier starting ...')
+  global knn
+  y_pred, knnacc = genericClassifier(knn, "CNN-KNN Accuracy: {0:0.1f}%", "SVM Confusion matrix")
+
+
+def cnnClassifier():
+     img_height_rows = 32
+     img_width_cols = 32
+     im_shape = (img_height_rows, img_width_cols, 1)
+     print(im_shape)
+     x_train = X_train.reshape(X_train.shape[0], *im_shape)  # Python TIP :the * operator unpacks the tuple
+     x_test = X_test.reshape(X_test.shape[0], *im_shape)
+     global cnn
+     kernelSize = (3, 3)
+     ip_activation = 'relu'
+     ip_conv_0 = Conv2D(filters=4, kernel_size=kernelSize, input_shape=im_shape, activation=ip_activation)
+     cnn.add(ip_conv_0)
+     # Add the next Convolutional+Activation layer
+     ip_conv_0_1 = Conv2D(filters=4, kernel_size=kernelSize, activation=ip_activation)
+     cnn.add(ip_conv_0_1)
+     # Add the Pooling layer
+     pool_0 = MaxPool2D(pool_size=(2, 2), strides=(2, 2), padding="same")
+     cnn.add(pool_0)
+     ip_conv_1 = Conv2D(filters=4, kernel_size=kernelSize, activation=ip_activation)
+     cnn.add(ip_conv_1)
+     ip_conv_1_1 = Conv2D(filters=4, kernel_size=kernelSize, activation=ip_activation)
+     cnn.add(ip_conv_1_1)
+     pool_1 = MaxPool2D(pool_size=(2, 2), strides=(2, 2), padding="same")
+     cnn.add(pool_1)
+     flat_layer_0 = Flatten()
+     cnn.add(Flatten())
+     # Now add the Dense layers
+     h_dense_0 = Dense(units=20, activation=ip_activation, kernel_initializer='uniform')
+     cnn.add(h_dense_0)
+     # Let's add one more before proceeding to the output layer
+     h_dense_1 = Dense(units=1024, activation=ip_activation, kernel_initializer='uniform', name='dense11')
+     cnn.add(h_dense_1)
+     n_classes = 36
+     op_activation = 'softmax'
+     output_layer = Dense(units=n_classes, activation=op_activation, kernel_initializer='uniform')
+     cnn.add(output_layer)
+     opt = optimizers.Adagrad(lr=0.001)
+     loss = 'categorical_crossentropy'
+     metrics = ['accuracy']
+     # Compile the classifier using the configuration we want
+     cnn.compile(optimizer=opt, loss=loss, metrics=metrics)
+     history = cnn.fit(x_train, T_train,
+                       batch_size=300, epochs=5,
+                       validation_data=(x_test, T_test))
+     scores = cnn.evaluate(x_test, T_test, verbose=0)
+     print("Accuracy: %.2f%%" % (scores[1] * 100))
 
 
 
@@ -288,6 +303,8 @@ if __name__ == "__main__":
     print ("Starting the Handwritten Text Classifier")
     handwritten_img = attemptOutOfBoxOCR()
     wordSegmentation(handwritten_img)
+    #lets prepare the classifiers
+    prepareTestTrainData()
     characterSegmentation()
 
 

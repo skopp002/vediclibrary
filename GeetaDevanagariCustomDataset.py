@@ -170,17 +170,18 @@ def characterSegmentation():
                     flat = imgData.flatten()
                     np.shape(flat)
                     flat = img.reshape(1,32,32,-1)#(1, -1)
-                    predictCharacters(img)
+                    predictCharacters(flat)
 
 
 def predictCharacters(char_img):
-    try:
+   # try:
         print("Attempting to print")
         cnn_pred = cnn.predict(char_img)
-        cv2.imshow("to predict",char_img)
-        print("CNN prediction is ",le.inverse_transform(cnn_pred[0]))
-    except ValueError:
+        print(cnn_pred)
+        print("CNN prediction is ",np.argmax(cnn_pred[0], axis=-1))#le.inverse_transform(cnn_pred[0]))
+    #except ValueError:
         print("Unknown label, skipping ..")
+
 
   #knn_pred = knn.predict(char_img)
   # print("KNN Prediction is", knn_pred)
@@ -205,13 +206,11 @@ def genericClassifier(clfr,  acc_str, matrix_header_str):
 def prepareTestTrainData():
     path = "./devanagari_custom_dataset/Train/"
     folders = os.listdir(path)
-    imageList = []
     imageMatrix = []
-    newIm = []
     labels = []
     # Get list of folders in current path
     for folder in folders:
-        if folder.startswith("character"):
+        if not folder.startswith("."):
             newPath = path + folder  # Create new path by adding folder name
             folderName = os.path.split(os.path.abspath(newPath))[1]
             print("Folder is ",folderName )
@@ -279,16 +278,18 @@ def cnnClassifier():
      h_dense_0 = Dense(units=20, activation=ip_activation, kernel_initializer='uniform')
      cnn.add(h_dense_0)
      # Let's add one more before proceeding to the output layer
-     h_dense_1 = Dense(units=1024, activation=ip_activation, kernel_initializer='uniform', name='dense11')
-     cnn.add(h_dense_1)
-     n_classes = 1#36 --> undo
+     n_classes = 2#36 --> undo
      op_activation = 'softmax'
      output_layer = Dense(units=n_classes, activation=op_activation, kernel_initializer='uniform')
      cnn.add(output_layer)
      opt = optimizers.Adagrad(lr=0.001)
-     loss = 'binary_crossentropy'#'categorical_crossentropy'  --> undo
+     loss = 'binary_crossentropy'#'categorical_crossentropy'  #--> undo
      metrics = ['accuracy']
      # Compile the classifier using the configuration we want
+     im_shape = (img_height_rows, img_width_cols, 1)
+     print(im_shape)
+     x_train = X_train.reshape(X_train.shape[0], *im_shape)  # Python TIP :the * operator unpacks the tuple
+     x_test = X_test.reshape(X_test.shape[0], *im_shape)
      cnn.compile(optimizer=opt, loss=loss, metrics=metrics)
      history = cnn.fit(x_train, T_train,
                        batch_size=300, epochs=5,
