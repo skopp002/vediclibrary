@@ -30,7 +30,7 @@ Below code shows the contents of the file with hindi detection
 from PIL import Image
 import pytesseract
 
-img = Image.open("dataset/HandwrittenBhagavadGeethaShlokas.jpg")
+img = Image.open("sourcetexts/HandwrittenBhagavadGeethaShlokas.jpg")
 img.load()
 text = pytesseract.image_to_string(img, lang="hin")  #Specify language to look after!
 # print("Lets print character at a time")

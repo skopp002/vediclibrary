@@ -166,21 +166,19 @@ def characterSegmentation():
                     imgData = np.array(img)
                     # inverted_image.save('new1.jpg')
                     # np.set_printoptions(threshold=100)
-
                     flat = imgData.flatten()
                     np.shape(flat)
                     flat = img.reshape(1,32,32,-1)#(1, -1)
+                    cv2.imshow("predicting"+str(i),img);cv2.waitKey(100)
                     predictCharacters(flat)
 
 
 def predictCharacters(char_img):
    # try:
-        print("Attempting to print")
         cnn_pred = cnn.predict(char_img)
-        print(cnn_pred)
         print("CNN prediction is ",np.argmax(cnn_pred[0], axis=-1))#le.inverse_transform(cnn_pred[0]))
     #except ValueError:
-        print("Unknown label, skipping ..")
+    #    print("Unknown label, skipping ..")
 
 
   #knn_pred = knn.predict(char_img)
@@ -278,7 +276,7 @@ def cnnClassifier():
      h_dense_0 = Dense(units=20, activation=ip_activation, kernel_initializer='uniform')
      cnn.add(h_dense_0)
      # Let's add one more before proceeding to the output layer
-     n_classes = 2#36 --> undo
+     n_classes = 10#36 --> undo
      op_activation = 'softmax'
      output_layer = Dense(units=n_classes, activation=op_activation, kernel_initializer='uniform')
      cnn.add(output_layer)
