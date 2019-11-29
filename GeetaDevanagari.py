@@ -60,8 +60,10 @@ X_test=[]
 T_train=[]
 T_test=[]
 cnn=Sequential()
-knn=KNeighborsClassifier()
+knn=KNeighborsClassifier(n_neighbors=36)
+random=RandomForestClassifier(n_estimators=150, random_state=0) #max_depth=10,
 le=preprocessing.LabelEncoder()
+le_name_mapping=dict()
 
 
 def attemptOutOfBoxOCR():
@@ -149,46 +151,52 @@ def characterSegmentation():
             os.makedirs(word_dir)
         # sort contours
         sorted_ctrs = sorted(ctrs, key=lambda ctr: cv2.boundingRect(ctr))
-        for i, cnt in enumerate(sorted_ctrs):
+        for j, cnt in enumerate(sorted_ctrs):
             if (cv2.contourArea(cnt) > 40):
                 x, y, w, h = cv2.boundingRect(cnt)
                 cv2.rectangle(croppedImage, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 roi = croppedImage[y:y + h, x:x + w]
-                # cv2.imshow('character no:' + str(i), roi)
-                # cv2.waitKey(1000)
                 if(w <= 200):
-                   # cv2.imshow(word_dir+"/char"+str(i)+".png", roi)
-                   # print("char image shape is ", roi.shape)
-                   # img = roi.resize((32, 32))
-                    img = np.pad(cv2.resize(roi, (28,28)), 2)
-                    write_status = cv2.imwrite(word_dir+"/char_new"+str(i)+".png",img)
-                   # img = roi.convert('L')
-                    imgData = np.array(img)
-                    # inverted_image.save('new1.jpg')
-                    # np.set_printoptions(threshold=100)
-
-                    flat = imgData.flatten()
-                    np.shape(flat)
-                    flat = img.reshape(1,32,32,-1)#(1, -1)
-                    predictCharacters(img)
+                   img = np.pad(cv2.resize(roi, (28, 28)), 2)
+                   write_status = cv2.imwrite(word_dir + "/char_new" + str(j) + ".png", img)
+                   predictCharacters('random', img, i, j)
+                   #predictCharacters('knn', img, i, j)
 
 
-def predictCharacters(char_img):
-    try:
-        print("Attempting to print")
-        cnn_pred = cnn.predict(char_img)
-        cv2.imshow("to predict",char_img)
-        print("CNN prediction is ",np.argmax(cnn_pred[0], axis=-1))#le.inverse_transform(cnn_pred[0]))
-    except ValueError:
-        print("Unknown label, skipping ..")
+def predictCharacters(clsfr, char_img, word_count, char_count):
+    imgData = np.array(char_img)
+    flat = imgData.flatten()
+    np.shape(flat)
+    label = ''
+    if (clsfr == 'cnn'):
+        flat = char_img.reshape(1, 32, 32, -1)  # (1, -1)
+        cnn_pred_mat = cnn.predict(flat)
+        cnn_pred = np.argmax(cnn_pred_mat[0], axis=-1)
+        label = le_name_mapping.get(cnn_pred, str(cnn_pred))
+        # except ValueError:
+        #    print("Unknown label, skipping ..")
+    elif (clsfr == 'knn'):
+        flat = char_img.reshape(1, -1)  # (1, -1)
+        knn_pred_mat = knn.predict(flat)
+        knn_pred = np.argmax(knn_pred_mat[0], axis=-1)
+        label = le_name_mapping.get(knn_pred, str(knn_pred))
+    elif (clsfr == 'random'):
+        flat = char_img.reshape(1, -1)  # (1, -1)
+        random_pred_mat = random.predict(flat)
+        random_pred = np.argmax(random_pred_mat[0], axis=-1)
+        label = le_name_mapping.get(random_pred, str(random_pred))
+    cv2.imshow("displaying " + label + str(word_count) + str(char_count), char_img);
+    cv2.waitKey(1000)
 
-  #knn_pred = knn.predict(char_img)
+
+#knn_pred = knn.predict(char_img)
   # print("KNN Prediction is", knn_pred)
 
 
 def prepareClassifiers():
-    #knnClassifier()
-    cnnClassifier()
+    #knnClassifier() #--> Takes too long on full dataset with n not specified
+    randomForestClassifier()
+    #cnnClassifier()
 
 def genericClassifier(clfr,  acc_str, matrix_header_str):
     """run chosen classifier and display results"""
@@ -236,7 +244,8 @@ def prepareTestTrainData():
     le.fit(T)
     T = le.transform(T)
     T = keras.utils.np_utils.to_categorical(T)
-    le_name_mapping = dict(zip(le.classes_, le.transform(le.classes_)))
+    global le_name_mapping
+    le_name_mapping = dict(zip(le.transform(le.classes_),le.classes_))
     print("Labels are" ,le_name_mapping)
     global X_train, X_test, T_train, T_test
     X_train, X_test, T_train, T_test = train_test_split(X, T, test_size=0.3, random_state=34)
@@ -247,6 +256,11 @@ def knnClassifier():
   print('KNN Classifier starting ...')
   global knn
   y_pred, knnacc = genericClassifier(knn, "CNN-KNN Accuracy: {0:0.1f}%", "SVM Confusion matrix")
+
+def randomForestClassifier():
+  print('Random Forest Classifier starting ...')
+  global random
+  y_pred, randomacc = genericClassifier(random, "CNN-Random Accuracy: {0:0.1f}%", "SVM Confusion matrix")
 
 
 def cnnClassifier():
