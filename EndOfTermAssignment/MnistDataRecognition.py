@@ -112,12 +112,12 @@ if __name__ == '__main__':
     ###Using PCA to do it out of the box. Lets use 3 components this time
 
     pca = PCA()
-    pca.n_components = 3
+    pca.n_components = 2
     pca_data = pca.fit_transform(std_data)
     print("PCA data ", pca_data.shape)
     pca_data = np.vstack((pca_data.T,label)).T
-    pca_df = pd.DataFrame(data=pca_data, columns=("p1","p2","p3","label"))
-    sn.FacetGrid(pca_df, hue="label", size=6).map(plt.scatter, "p1", "p2","p3").add_legend()
+    pca_df = pd.DataFrame(data=pca_data, columns=("p1","p2","label"))
+    sn.FacetGrid(pca_df, hue="label", size=6).map(plt.scatter, "p1", "p2").add_legend()
     plt.show()
 
 
