@@ -14,3 +14,4 @@ Classfication:
 2. GeetaDevanagari.py which augments UCI dataset with the custom dataset created. The "path" variable defined in prepareTestTrainData function needs to point to the Train data from UCI dataset
 
 
+Youtube Presentation of the project: https://www.youtube.com/watch?v=2h_k0kMbb90&list=PLKyD-cTJmDwFwMaXRh3eymbaYL2wScXGf
