@@ -302,7 +302,7 @@ def cnnClassifier():
      output_layer = Dense(units=n_classes, activation=op_activation, kernel_initializer='uniform')
      cnn.add(output_layer)
      opt = optimizers.Adagrad(lr=0.001)
-     loss = 'binary_crossentropy'#'categorical_crossentropy'  #--> undo
+     loss = 'categorical_crossentropy'#'categorical_crossentropy'  #--> undo
      metrics = ['accuracy']
      # Compile the classifier using the configuration we want
      im_shape = (img_height_rows, img_width_cols, 1)

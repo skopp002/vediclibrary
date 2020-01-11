@@ -130,7 +130,7 @@ def wordSegmentation(simple_sanskrit):
             cv2.rectangle(thresh,(x,y),( x + w, y + h ),(90,0,255),2)
 
 
-def characterSegmentation():
+def characterSegmentation(classifier):
     path = "./selected_contour_segments/"
     wordsegments = os.listdir(path)
     for i, wordimg in enumerate(wordsegments):
@@ -159,8 +159,7 @@ def characterSegmentation():
                 if(w <= 200):
                    img = np.pad(cv2.resize(roi, (28, 28)), 2)
                    write_status = cv2.imwrite(word_dir + "/char_new" + str(j) + ".png", img)
-                   predictCharacters('random', img, i, j)
-                   #predictCharacters('knn', img, i, j)
+                   predictCharacters(classifier, img, i, j)
 
 
 def predictCharacters(clsfr, char_img, word_count, char_count):
@@ -189,14 +188,13 @@ def predictCharacters(clsfr, char_img, word_count, char_count):
     cv2.waitKey(1000)
 
 
-#knn_pred = knn.predict(char_img)
-  # print("KNN Prediction is", knn_pred)
-
-
-def prepareClassifiers():
-    #knnClassifier() #--> Takes too long on full dataset with n not specified
-    randomForestClassifier()
-    #cnnClassifier()
+def prepareClassifiers(classifier):
+   if(classifier == "knn"):
+        knnClassifier() #--> Takes too long on full dataset with n not specified
+   elif (classifier == "random"):
+       randomForestClassifier()
+   elif(classifier == "cnn"):
+       cnnClassifier()
 
 def genericClassifier(clfr,  acc_str, matrix_header_str):
     """run chosen classifier and display results"""
@@ -210,7 +208,7 @@ def genericClassifier(clfr,  acc_str, matrix_header_str):
     return y_pred,acc
 
 #Code reference https://github.com/PriSawant7/ML-Devanagari-Character-Recognition/blob/master/Devanagari_Character_Recoginition.ipynb
-def prepareTestTrainData():
+def prepareTestTrainData(classifier):
     path = "/Users/sunitakoppar/PycharmProjects/datasets/DevanagariHandwrittenCharacterDataset/Train/"
     folders = os.listdir(path)
     imageList = []
@@ -249,7 +247,7 @@ def prepareTestTrainData():
     print("Labels are" ,le_name_mapping)
     global X_train, X_test, T_train, T_test
     X_train, X_test, T_train, T_test = train_test_split(X, T, test_size=0.3, random_state=34)
-    prepareClassifiers()
+    prepareClassifiers(classifier)
 
 
 def knnClassifier():
@@ -314,12 +312,13 @@ def cnnClassifier():
 
 
 if __name__ == "__main__":
+    classifier="random"#"cnn" #
     print ("Starting the Handwritten Text Classifier")
     handwritten_img = attemptOutOfBoxOCR()
     wordSegmentation(handwritten_img)
     #lets prepare the classifiers
-    prepareTestTrainData()
-    characterSegmentation()
+    prepareTestTrainData(classifier)
+    characterSegmentation(classifier)
 
 
 
