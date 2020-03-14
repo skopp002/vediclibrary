@@ -13,7 +13,10 @@ import pytesseract
 pytesseract just provides python bindings to the extent of calling tesseract installed locally on the system.
 tessearct itself is an open source library in C/C++
 '''
-
+import codecs
+import io
+import pprint
+import csv
 import imutils
 import numpy as np
 import matplotlib.pyplot as plt
@@ -65,6 +68,8 @@ random=RandomForestClassifier(n_estimators=150, random_state=0) #max_depth=10,
 le=preprocessing.LabelEncoder()
 le_name_mapping=dict()
 
+with codecs.open('sourcetexts/UnicodeDevanagariSymbolsMap.csv', 'r',encoding='utf-8') as f:  # newline='' to be added foer io.open
+    unicodemap = dict(csv.reader(f))
 
 def attemptOutOfBoxOCR():
     #geeta_img = cv2.imread("dataset/Devanagari/HandwrittenGeetaShlokas_1.jpg")
@@ -147,16 +152,17 @@ def characterSegmentation(classifier):
         contours = cv2.findContours(croppedImage.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         ctrs = imutils.grab_contours(contours)
         word_dir=  "./segmented_chars/word_"+ str(i) + "/"
+        print ("Displaying word ", i)
         if not os.path.exists(word_dir):
             os.makedirs(word_dir)
         # sort contours
         sorted_ctrs = sorted(ctrs, key=lambda ctr: cv2.boundingRect(ctr))
         for j, cnt in enumerate(sorted_ctrs):
-            if (cv2.contourArea(cnt) > 40):
+            if (cv2.contourArea(cnt) > 35):
                 x, y, w, h = cv2.boundingRect(cnt)
                 cv2.rectangle(croppedImage, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 roi = croppedImage[y:y + h, x:x + w]
-                if(w <= 200):
+                if(w <= 180):
                    img = np.pad(cv2.resize(roi, (28, 28)), 2)
                    write_status = cv2.imwrite(word_dir + "/char_new" + str(j) + ".png", img)
                    predictCharacters(classifier, img, i, j)
@@ -184,8 +190,10 @@ def predictCharacters(clsfr, char_img, word_count, char_count):
         random_pred_mat = random.predict(flat)
         random_pred = np.argmax(random_pred_mat[0], axis=-1)
         label = le_name_mapping.get(random_pred, str(random_pred))
-    cv2.imshow("displaying " + label + str(word_count) + str(char_count), char_img);
-    cv2.waitKey(1000)
+        # https://unicode.org/charts/PDF/U0900.pdf
+        print(unicodemap[label])
+# cv2.imshow("displaying " + label + str(word_count) + str(char_count), char_img);
+    #cv2.waitKey(1000)
 
 
 def prepareClassifiers(classifier):
@@ -310,7 +318,8 @@ def cnnClassifier():
 
 
 
-
+#TODO Use imrotate and max vertical projection by picking the theta at which the vertical projection is highest
+import unicodedata
 if __name__ == "__main__":
     classifier="random"#"cnn" #
     print ("Starting the Handwritten Text Classifier")
