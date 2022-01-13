@@ -4,7 +4,7 @@ ipython==7.11.1
 keras==2.3.1
 numpy==1.18.1
 pandas==0.25.3
-Pillow==7.0.0
+Pillow==9.0.0
 pyspark==2.4.4
 pytesseract==0.3.1
 scikit_learn==0.22.1
